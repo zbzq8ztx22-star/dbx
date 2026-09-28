@@ -434,6 +434,9 @@ pub fn is_write_sql_for_database(sql: &str, database_type: DatabaseType) -> bool
     if let Some(risk) = classify_search_engine_query_risk(sql, database_type) {
         return risk != SearchEngineQueryRisk::ReadOnly;
     }
+    if let Some(risk) = classify_vector_query_risk(sql, database_type) {
+        return risk != SearchEngineQueryRisk::ReadOnly;
+    }
     is_write_sql_with_database_type(sql, Some(database_type))
 }
 
@@ -673,6 +676,82 @@ fn solr_replication_request_is_mutation(raw_path: &str, segments: &[&str]) -> bo
         None => false,
         Some(command) => !READ_ONLY_COMMANDS.iter().any(|readonly| readonly.eq_ignore_ascii_case(command)),
     }
+}
+
+/// 对向量数据库的 REST 风格查询进行风险分类。
+/// 未知写端点一律视为高风险，防止通用查询绕过专用向量工具。
+pub(crate) fn classify_vector_query_risk(source: &str, database_type: DatabaseType) -> Option<SearchEngineQueryRisk> {
+    if !matches!(
+        database_type,
+        DatabaseType::Qdrant | DatabaseType::Milvus | DatabaseType::Weaviate | DatabaseType::ChromaDb
+    ) {
+        return None;
+    }
+    let source = strip_leading_search_engine_comments(source);
+    let request_line = source.lines().next()?.trim();
+    let mut parts = request_line.split_whitespace();
+    let method = parts.next()?.to_ascii_uppercase();
+    let path = parts.next()?.split('?').next().unwrap_or("").trim_end_matches('/').to_ascii_lowercase();
+
+    if matches!(method.as_str(), "GET" | "HEAD" | "OPTIONS") {
+        return Some(SearchEngineQueryRisk::ReadOnly);
+    }
+
+    let risk = match database_type {
+        DatabaseType::Milvus => match (method.as_str(), path.as_str()) {
+            (
+                "POST",
+                "/v2/vectordb/entities/search"
+                | "/v2/vectordb/entities/query"
+                | "/v2/vectordb/entities/get"
+                | "/v2/vectordb/collections/list"
+                | "/v2/vectordb/collections/describe"
+                | "/v2/vectordb/databases/list"
+                | "/v2/vectordb/indexes/list"
+                | "/v2/vectordb/indexes/describe",
+            ) => SearchEngineQueryRisk::ReadOnly,
+            ("POST", "/v2/vectordb/entities/insert" | "/v2/vectordb/entities/upsert") => SearchEngineQueryRisk::Write,
+            ("POST", "/v2/vectordb/entities/delete") => SearchEngineQueryRisk::Dangerous,
+            ("POST" | "PUT" | "PATCH" | "DELETE", _) => SearchEngineQueryRisk::Dangerous,
+            _ => return None,
+        },
+        DatabaseType::Qdrant => {
+            let read_post = ["/scroll", "/search", "/query", "/recommend", "/discover", "/count"]
+                .iter()
+                .any(|suffix| path.ends_with(suffix));
+            if method == "POST" && read_post {
+                SearchEngineQueryRisk::ReadOnly
+            } else if method == "PUT" && path.contains("/points") {
+                SearchEngineQueryRisk::Write
+            } else if matches!(method.as_str(), "POST" | "PUT" | "PATCH" | "DELETE") {
+                SearchEngineQueryRisk::Dangerous
+            } else {
+                return None;
+            }
+        }
+        DatabaseType::ChromaDb => {
+            let read_post = ["/get", "/query", "/count"].iter().any(|suffix| path.ends_with(suffix));
+            let safe_write_post = ["/add", "/update", "/upsert"].iter().any(|suffix| path.ends_with(suffix));
+            if method == "POST" && read_post {
+                SearchEngineQueryRisk::ReadOnly
+            } else if method == "POST" && safe_write_post {
+                SearchEngineQueryRisk::Write
+            } else if matches!(method.as_str(), "POST" | "PUT" | "PATCH" | "DELETE") {
+                SearchEngineQueryRisk::Dangerous
+            } else {
+                return None;
+            }
+        }
+        DatabaseType::Weaviate => {
+            if matches!(method.as_str(), "POST" | "PUT" | "PATCH" | "DELETE") {
+                SearchEngineQueryRisk::Dangerous
+            } else {
+                return None;
+            }
+        }
+        _ => return None,
+    };
+    Some(risk)
 }
 
 fn strip_leading_search_engine_comments(input: &str) -> &str {
@@ -2433,6 +2512,25 @@ mod tests {
             "PUT /products/_doc/1?refresh=true\n{\"name\":\"Notebook\"}",
             DatabaseType::Easysearch
         ));
+    }
+
+    #[test]
+    fn classifies_vector_rest_queries_without_treating_every_post_as_read_only() {
+        assert!(!is_write_sql_for_database(
+            "POST /v2/vectordb/entities/search\n{\"collectionName\":\"semantic_cards\"}",
+            DatabaseType::Milvus,
+        ));
+        assert!(is_write_sql_for_database(
+            "POST /v2/vectordb/entities/upsert\n{\"collectionName\":\"semantic_cards\"}",
+            DatabaseType::Milvus,
+        ));
+        assert!(is_write_sql_for_database(
+            "POST /v2/vectordb/entities/delete\n{\"filter\":\"semantic_batch_id == 'x'\"}",
+            DatabaseType::Milvus,
+        ));
+        assert!(is_write_sql_for_database("POST /v2/vectordb/collections/drop\n{}", DatabaseType::Milvus,));
+        assert!(!is_write_sql_for_database("POST /collections/cards/points/search\n{}", DatabaseType::Qdrant,));
+        assert!(is_write_sql_for_database("PUT /collections/cards/points\n{}", DatabaseType::Qdrant,));
     }
 
     #[test]

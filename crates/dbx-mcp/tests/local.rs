@@ -2,7 +2,7 @@
 use std::ffi::OsString;
 use std::sync::Arc;
 
-use dbx_core::{models::connection::ConnectionConfig, storage::Storage};
+use dbx_core::{connection::AppState, models::connection::ConnectionConfig, storage::Storage};
 use dbx_mcp::{DbxBackend, DbxMcpServer, LocalBackend, McpScope};
 use rmcp::{model::CallToolRequestParams, ServiceExt};
 use serde_json::{json, Map, Value};
@@ -90,10 +90,68 @@ async fn local_backend_reads_dbx_storage_without_desktop_process() {
 }
 
 #[tokio::test]
-async fn duplicate_connection_preserves_secrets_ssh_and_sidebar_group() {
+async fn local_vector_search_rejects_empty_semantic_version_before_network_access() {
     let directory = tempdir().expect("temporary data directory");
     let db_path = directory.path().join("dbx.db");
     let storage = Storage::open(&db_path).await.expect("open storage");
+    let connection: ConnectionConfig = serde_json::from_value(json!({
+        "id": "milvus-local",
+        "name": "semantic-local",
+        "db_type": "milvus",
+        "host": "127.0.0.1",
+        "port": 19530,
+        "username": "",
+        "password": "",
+        "database": "default",
+        "ssl": false
+    }))
+    .expect("Milvus connection");
+    storage.save_connections(&[connection]).await.expect("save Milvus connection");
+    drop(storage);
+
+    let backend = Arc::new(LocalBackend::open(&db_path).await.expect("open local backend"));
+    let server = DbxMcpServer::with_runtime_options(backend, McpScope::default(), false);
+    let (server_transport, client_transport) = tokio::io::duplex(64 * 1024);
+    let server_task = tokio::spawn(async move { server.serve(server_transport).await });
+    let client = ().serve(client_transport).await.expect("initialize client");
+    let result = client
+        .peer()
+        .call_tool(
+            CallToolRequestParams::new("dbx_vector_search").with_arguments(
+                json!({
+                    "connection_id": "milvus-local",
+                    "database": "default",
+                    "collection": "semantic_cards",
+                    "active_at": "2026-08-25",
+                    "semantic_version": "   ",
+                    "embedding": vec![0.0_f32; 1024]
+                })
+                .as_object()
+                .cloned()
+                .unwrap_or_else(Map::new),
+            ),
+        )
+        .await
+        .expect("call vector search");
+    assert_eq!(result.is_error, Some(true));
+    assert_eq!(
+        result.structured_content.as_ref().and_then(|value| value.pointer("/error/code")),
+        Some(&json!("VECTOR_SEMANTIC_VERSION_REQUIRED"))
+    );
+    client.cancel().await.expect("close MCP client");
+    server_task.abort();
+}
+
+#[tokio::test]
+async fn duplicate_connection_preserves_secrets_ssh_and_sidebar_group() {
+    let directory = tempdir().expect("temporary data directory");
+    let db_path = directory.path().join("dbx.db");
+    let storage = Storage::open_with_secret_key_policy(
+        &db_path,
+        dbx_core::persistence::secret_codec::SecretKeyPolicy::ManagedDataDir,
+    )
+    .await
+    .expect("open storage");
     storage
         .save_mcp_global_policy(&dbx_core::storage::McpGlobalPolicy {
             read_only: false,
@@ -167,10 +225,14 @@ async fn duplicate_connection_preserves_secrets_ssh_and_sidebar_group() {
         .await
         .expect("save sidebar layout");
 
-    let backend = Arc::new(LocalBackend::open(&db_path).await.expect("open local backend"));
+    let backend = Arc::new(LocalBackend::from_app_state(
+        Arc::new(AppState::new(storage.clone())),
+        directory.path().to_path_buf(),
+    ));
     let policy = backend.load_mcp_global_policy().await.expect("load configured policy");
     assert!(!policy.read_only);
-    let server = DbxMcpServer::with_runtime_options(backend, McpScope::default(), false);
+    let server =
+        DbxMcpServer::with_runtime_options_and_connection_management(backend, McpScope::default(), false, true);
     let (server_transport, client_transport) = tokio::io::duplex(16 * 1024);
     let server_task = tokio::spawn(async move { server.serve(server_transport).await });
     let client = ().serve(client_transport).await.expect("initialize client");
@@ -255,7 +317,12 @@ async fn duplicate_connection_preserves_secrets_ssh_and_sidebar_group() {
     client.cancel().await.expect("close client");
     server_task.abort();
 
-    let reopened = Storage::open(&db_path).await.expect("reopen storage");
+    let reopened = Storage::open_with_secret_key_policy(
+        &db_path,
+        dbx_core::persistence::secret_codec::SecretKeyPolicy::ManagedDataDir,
+    )
+    .await
+    .expect("reopen storage");
     let connections = reopened.load_connections().await.expect("reload connections");
     assert_eq!(connections.len(), 4, "failed duplicates must not add connections");
     let copied = connections
