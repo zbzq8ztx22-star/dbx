@@ -1437,22 +1437,65 @@ async fn serve() {
 
     let listener = tokio::net::TcpListener::bind(addr).await.expect("Failed to bind address");
     let shutdown_state = web_state.app.clone();
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async move {
-            #[cfg(unix)]
-            {
-                let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-                    .expect("Failed to listen for SIGTERM");
-                tokio::select! { _ = tokio::signal::ctrl_c() => {}, _ = terminate.recv() => {} }
+    let server_shutdown = tokio_util::sync::CancellationToken::new();
+    let server_shutdown_trigger = server_shutdown.clone();
+    tokio::spawn(async move {
+        #[cfg(unix)]
+        {
+            let mut terminate = match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::error!("Failed to install SIGTERM handler: {e}");
+                    return;
+                }
+            };
+            tokio::select! {
+                res = tokio::signal::ctrl_c() => {
+                    if let Err(e) = res {
+                        tracing::error!("Failed to listen for Ctrl+C: {e}");
+                    } else {
+                        tracing::info!("Shutdown signal received (Ctrl+C)");
+                    }
+                }
+                _ = terminate.recv() => {
+                    tracing::info!("Shutdown signal received (SIGTERM)");
+                }
             }
-            #[cfg(not(unix))]
-            let _ = tokio::signal::ctrl_c().await;
-            backup_stop.cancel();
-        })
-        .await
-        .expect("Server error");
-    let _ = tokio::time::timeout(std::time::Duration::from_secs(60), backup_worker).await;
+        }
+        #[cfg(not(unix))]
+        {
+            if let Err(e) = tokio::signal::ctrl_c().await {
+                tracing::error!("Failed to listen for Ctrl+C: {e}");
+            } else {
+                tracing::info!("Shutdown signal received (Ctrl+C)");
+            }
+        }
+        backup_stop.cancel();
+        server_shutdown_trigger.cancel();
+    });
+
+    let shutdown_wait = server_shutdown.clone();
+    let serve_future = axum::serve(listener, app).with_graceful_shutdown(async move {
+        shutdown_wait.cancelled().await;
+    });
+
+    // If graceful shutdown of HTTP connections takes longer than 5 seconds, abort to ensure prompt termination on Ctrl+C.
+    tokio::select! {
+        res = serve_future => {
+            if let Err(e) = res {
+                tracing::error!("Server error: {e}");
+            }
+        }
+        _ = async {
+            server_shutdown.cancelled().await;
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        } => {
+            tracing::warn!("Graceful HTTP shutdown timed out after 5s; proceeding with teardown");
+        }
+    }
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), backup_worker).await;
     shutdown_state.shutdown(std::time::Duration::from_secs(3)).await;
+    std::process::exit(0);
 }
 
 #[cfg(test)]

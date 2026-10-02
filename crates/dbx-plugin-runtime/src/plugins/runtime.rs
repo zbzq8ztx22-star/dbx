@@ -358,7 +358,12 @@ impl PluginSidecarSession {
         self.status.send_replace(PluginSessionStatus::new(PluginSessionState::Stopping, None));
         // Let any open user prompt resolve and close its dialog.
         self.prompts.close();
-        let kill_result = self.child.lock().await.kill().await;
+        let mut child = self.child.lock().await;
+        let kill_result = child.kill().await;
+        // On Windows and Unix, reaping the child via wait() ensures the OS releases all process
+        // handles, loaded executable binaries, and file locks before callers attempt to rename
+        // or delete the plugin's container directory (fixes os error 5 / access denied on uninstall).
+        let _ = child.wait().await;
         let message = kill_result.err().map(|error| error.to_string());
         fail_pending(&self.pending, "Plugin session stopped").await;
         self.status.send_replace(PluginSessionStatus::new(PluginSessionState::Stopped, message));
