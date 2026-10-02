@@ -1108,6 +1108,7 @@ export default withEnglishFallback({
     searchDatabasePlaceholder: "データベースタイプを検索",
     searchResults: "検索結果",
     databaseCategories: "カテゴリ",
+    databaseCategoryAll: "すべて",
     databaseCategorySql: "リレーショナル",
     databaseCategoryAnalytics: "分析",
     databaseCategoryDomestic: "中国系DB",
