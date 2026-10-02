@@ -4213,6 +4213,9 @@ export default withEnglishFallback({
     objectBrowser: "Navegar no Navegador de Objetos ({count})",
     extensions: "Extensões",
     eventTriggers: "Gatilhos de evento",
+    foreignDataWrappers: "Foreign Data Wrappers",
+    foreignServers: "Foreign Servers",
+    userMappings: "User Mappings",
     types: "Tipos",
     gridfs: "GridFS",
     buckets: "Buckets",
@@ -9289,6 +9292,38 @@ export default withEnglishFallback({
     enabled: "Habilitado",
     tags: "Etiquetas",
     definition: "Definição",
+  },
+
+  foreignDataWrapper: {
+    detailsTitle: "Foreign Data Wrapper Details",
+    viewDetails: "View details",
+    name: "Name",
+    owner: "Owner",
+    handler: "Handler",
+    validator: "Validator",
+    options: "Options",
+    definition: "DDL",
+  },
+
+  foreignServer: {
+    detailsTitle: "Foreign Server Details",
+    viewDetails: "View details",
+    name: "Name",
+    owner: "Owner",
+    foreignDataWrapper: "Foreign Data Wrapper",
+    type: "Type",
+    version: "Version",
+    options: "Options",
+    definition: "DDL",
+  },
+
+  userMapping: {
+    detailsTitle: "User Mapping Details",
+    viewDetails: "View details",
+    userName: "User",
+    serverName: "Server",
+    options: "Options",
+    definition: "DDL",
   },
 
   extension: {

@@ -4211,6 +4211,9 @@ export default withEnglishFallback({
     objectBrowser: "在物件瀏覽器中檢視 ({count})",
     extensions: "擴展",
     eventTriggers: "事件觸發器",
+    foreignDataWrappers: "Foreign Data Wrappers",
+    foreignServers: "Foreign Servers",
+    userMappings: "User Mappings",
     types: "類型",
     gridfs: "GridFS",
     buckets: "Buckets",
@@ -9296,6 +9299,38 @@ export default withEnglishFallback({
     enabled: "啟用狀態",
     tags: "標籤",
     definition: "定義",
+  },
+
+  foreignDataWrapper: {
+    detailsTitle: "Foreign Data Wrapper Details",
+    viewDetails: "View details",
+    name: "Name",
+    owner: "Owner",
+    handler: "Handler",
+    validator: "Validator",
+    options: "Options",
+    definition: "DDL",
+  },
+
+  foreignServer: {
+    detailsTitle: "Foreign Server Details",
+    viewDetails: "View details",
+    name: "Name",
+    owner: "Owner",
+    foreignDataWrapper: "Foreign Data Wrapper",
+    type: "Type",
+    version: "Version",
+    options: "Options",
+    definition: "DDL",
+  },
+
+  userMapping: {
+    detailsTitle: "User Mapping Details",
+    viewDetails: "View details",
+    userName: "User",
+    serverName: "Server",
+    options: "Options",
+    definition: "DDL",
   },
 
   extension: {

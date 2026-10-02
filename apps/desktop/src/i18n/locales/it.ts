@@ -4211,6 +4211,9 @@ export default withEnglishFallback({
     objectBrowser: "Sfoglia in Esplora Oggetti ({count})",
     extensions: "Estensioni",
     eventTriggers: "Trigger di evento",
+    foreignDataWrappers: "Foreign Data Wrappers",
+    foreignServers: "Foreign Servers",
+    userMappings: "User Mappings",
     types: "Tipi",
     gridfs: "GridFS",
     buckets: "Buckets",
@@ -9289,6 +9292,38 @@ export default withEnglishFallback({
     enabled: "Abilitato",
     tags: "Tag",
     definition: "Definizione",
+  },
+
+  foreignDataWrapper: {
+    detailsTitle: "Foreign Data Wrapper Details",
+    viewDetails: "View details",
+    name: "Name",
+    owner: "Owner",
+    handler: "Handler",
+    validator: "Validator",
+    options: "Options",
+    definition: "DDL",
+  },
+
+  foreignServer: {
+    detailsTitle: "Foreign Server Details",
+    viewDetails: "View details",
+    name: "Name",
+    owner: "Owner",
+    foreignDataWrapper: "Foreign Data Wrapper",
+    type: "Type",
+    version: "Version",
+    options: "Options",
+    definition: "DDL",
+  },
+
+  userMapping: {
+    detailsTitle: "User Mapping Details",
+    viewDetails: "View details",
+    userName: "User",
+    serverName: "Server",
+    options: "Options",
+    definition: "DDL",
   },
 
   extension: {

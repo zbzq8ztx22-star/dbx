@@ -4278,6 +4278,9 @@ export default withEnglishFallback({
     objectBrowser: "Открыть в обозревателе объектов ({count})",
     extensions: "Расширения",
     eventTriggers: "Триггеры событий",
+    foreignDataWrappers: "Foreign Data Wrappers",
+    foreignServers: "Foreign Servers",
+    userMappings: "User Mappings",
   },
   eventTrigger: {
     detailsTitle: "Сведения о триггере события",
@@ -4289,6 +4292,38 @@ export default withEnglishFallback({
     enabled: "Включено",
     tags: "Теги",
     definition: "Определение",
+  },
+
+  foreignDataWrapper: {
+    detailsTitle: "Foreign Data Wrapper Details",
+    viewDetails: "View details",
+    name: "Name",
+    owner: "Owner",
+    handler: "Handler",
+    validator: "Validator",
+    options: "Options",
+    definition: "DDL",
+  },
+
+  foreignServer: {
+    detailsTitle: "Foreign Server Details",
+    viewDetails: "View details",
+    name: "Name",
+    owner: "Owner",
+    foreignDataWrapper: "Foreign Data Wrapper",
+    type: "Type",
+    version: "Version",
+    options: "Options",
+    definition: "DDL",
+  },
+
+  userMapping: {
+    detailsTitle: "User Mapping Details",
+    viewDetails: "View details",
+    userName: "User",
+    serverName: "Server",
+    options: "Options",
+    definition: "DDL",
   },
 
   extension: {

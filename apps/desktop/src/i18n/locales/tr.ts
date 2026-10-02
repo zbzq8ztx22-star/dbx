@@ -3994,6 +3994,9 @@ export default withEnglishFallback({
     objectBrowser: "Nesne Gezgininde Gözat ({count})",
     extensions: "Uzantılar",
     eventTriggers: "Olay tetikleyicileri",
+    foreignDataWrappers: "Foreign Data Wrappers",
+    foreignServers: "Foreign Servers",
+    userMappings: "User Mappings",
   },
   eventTrigger: {
     detailsTitle: "Olay tetikleyici ayrıntıları",
@@ -4005,6 +4008,38 @@ export default withEnglishFallback({
     enabled: "Etkin",
     tags: "Etiketler",
     definition: "Tanım",
+  },
+
+  foreignDataWrapper: {
+    detailsTitle: "Foreign Data Wrapper Details",
+    viewDetails: "View details",
+    name: "Name",
+    owner: "Owner",
+    handler: "Handler",
+    validator: "Validator",
+    options: "Options",
+    definition: "DDL",
+  },
+
+  foreignServer: {
+    detailsTitle: "Foreign Server Details",
+    viewDetails: "View details",
+    name: "Name",
+    owner: "Owner",
+    foreignDataWrapper: "Foreign Data Wrapper",
+    type: "Type",
+    version: "Version",
+    options: "Options",
+    definition: "DDL",
+  },
+
+  userMapping: {
+    detailsTitle: "User Mapping Details",
+    viewDetails: "View details",
+    userName: "User",
+    serverName: "Server",
+    options: "Options",
+    definition: "DDL",
   },
 
   extension: {
