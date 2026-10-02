@@ -2191,6 +2191,7 @@ export const useQueryStore = defineStore("query", () => {
     const primaryResult = tab.results?.[0] ?? tab.result;
     const run: NonNullable<QueryTab["resultRuns"]>[number] = {
       id: uuid(),
+      connectionId: tab.connectionId,
       title: options.title ?? `Run ${sequence}`,
       customTitle: !!options.title,
       sequence,
@@ -2308,6 +2309,7 @@ export const useQueryStore = defineStore("query", () => {
     const run = {
       ...tab.resultRuns[index],
       ...(sql ? { sql } : {}),
+      connectionId: sql ? tab.connectionId : tab.resultRuns[index].connectionId,
       result: tab.result,
       results: tab.results,
       activeResultIndex: tab.activeResultIndex,
@@ -2629,6 +2631,7 @@ export const useQueryStore = defineStore("query", () => {
       // for each result run, without tracking the potentially large payload.
       resultRuns: t.resultRuns?.map((run) => ({
         id: run.id,
+        connectionId: run.connectionId,
         title: run.title,
         sequence: run.sequence,
         sql: run.sql,
